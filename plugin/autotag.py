@@ -26,6 +26,7 @@ GLOBALS_DEFAULTS = dict(maxTagsFileSize=1024 * 1024 * 7,
                         CtagsCmd="ctags",
                         TagsFile="tags",
                         TagsDir="",
+                        TagsSrcList="cscope.files",
                         Disabled=0,
                         StopAt=0)
 
@@ -149,6 +150,7 @@ class AutoTag(object):  # pylint: disable=R0902
         self.ctags_cmd = vim_global("CtagsCmd")
         self.tags_file = str(vim_global("TagsFile"))
         self.tags_dir = str(vim_global("TagsDir"))
+        self.tags_src_list = str(vim_global("TagsSrcList"))
         self.parents = os.pardir * (len(os.path.split(self.tags_dir)) - 1)
         self.count = 0
         self.stop_at = vim_global("StopAt")
@@ -242,10 +244,18 @@ class AutoTag(object):  # pylint: disable=R0902
         if self.tags_dir:
             sources = [os.path.join(self.parents + s) for s in sources]
         self.stripTags(tags_file, sources)
+
         if self.tags_file:
-            cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
+            if os.path.isfile(self.tags_src_list):
+                cmd = "%s -L %s -f %s -a " % (self.ctags_cmd, self.tags_src_list, self.tags_file)
+            else:
+                cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
         else:
-            cmd = "%s -a " % (self.ctags_cmd,)
+            if os.path.isfile(self.tags_src_list):
+                cmd = "%s -L %s -a " % (self.ctags_cmd, self.tags_src_list)
+            else:
+                cmd = "%s -a " % (self.ctags_cmd,)
+
         for source in sources:
             if os.path.isfile(os.path.join(tags_dir, self.tags_dir, source)):
                 cmd += ' "%s"' % source
