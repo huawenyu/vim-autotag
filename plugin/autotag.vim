@@ -51,7 +51,7 @@ if has("python") || has("python3")
 
    augroup autotag
       au!
-      autocmd BufWritePost,FileWritePost * call AutoTag ()
+      autocmd BufWritePost,FileWritePost * call AutoTag()
    augroup END
 
 endif " has("python") or has("python3")

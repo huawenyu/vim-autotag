@@ -26,7 +26,6 @@ GLOBALS_DEFAULTS = dict(maxTagsFileSize=1024 * 1024 * 7,
                         CtagsCmd="ctags",
                         TagsFile="tags",
                         TagsDir="",
-                        TagsSrcList="cscope.files",
                         Disabled=0,
                         StopAt=0)
 
@@ -124,9 +123,15 @@ def setLoggerVerbosity():
 
 def makeAndAddHandler(logger, name):
     """ Make the handler and add it to the standard logger """
-    ret = VimAppendHandler(name)
-    logger.addHandler(ret)
-    return ret
+    #ret = VimAppendHandler(name)
+    #logger.addHandler(ret)
+    #return ret
+
+    hdlr = logging.FileHandler('/tmp/vim-autotag.log')
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    hdlr.setFormatter(formatter)
+    logger.addHandler(hdlr)
+    return hdlr
 
 try:
     LOGGER
@@ -150,7 +155,6 @@ class AutoTag(object):  # pylint: disable=R0902
         self.ctags_cmd = vim_global("CtagsCmd")
         self.tags_file = str(vim_global("TagsFile"))
         self.tags_dir = str(vim_global("TagsDir"))
-        self.tags_src_list = str(vim_global("TagsSrcList"))
         self.parents = os.pardir * (len(os.path.split(self.tags_dir)) - 1)
         self.count = 0
         self.stop_at = vim_global("StopAt")
@@ -203,6 +207,7 @@ class AutoTag(object):  # pylint: disable=R0902
         found = self.findTagFile(source)
         if found:
             (tags_dir, tags_file) = found  # pylint: disable=W0633
+            AutoTag.LOG.info("Found tags ver=%s dir=%s file=%s", sys.version, tags_dir, tags_file)
             relative_source = os.path.splitdrive(source)[1][len(tags_dir):]
             if relative_source[0] == os.sep:
                 relative_source = relative_source[1:]
@@ -246,22 +251,18 @@ class AutoTag(object):  # pylint: disable=R0902
         self.stripTags(tags_file, sources)
 
         if self.tags_file:
-            if os.path.isfile(self.tags_src_list):
-                cmd = "%s -L %s -f %s -a " % (self.ctags_cmd, self.tags_src_list, self.tags_file)
-            else:
-                cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
+            cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
         else:
-            if os.path.isfile(self.tags_src_list):
-                cmd = "%s -L %s -a " % (self.ctags_cmd, self.tags_src_list)
-            else:
-                cmd = "%s -a " % (self.ctags_cmd,)
+            cmd = "%s -a " % (self.ctags_cmd,)
 
         for source in sources:
             if os.path.isfile(os.path.join(tags_dir, self.tags_dir, source)):
                 cmd += ' "%s"' % source
-        AutoTag.LOG.log(1, "%s: %s", tags_dir, cmd)
-        for l in do_cmd(cmd, self.tags_dir or tags_dir):
-            AutoTag.LOG.log(10, l)
+
+        AutoTag.LOG.log(10, "%s: %s", tags_dir, cmd)
+        do_cmd(cmd, self.tags_dir or tags_dir)
+        #for l in do_cmd(cmd, self.tags_dir or tags_dir):
+        #    AutoTag.LOG.log(10, l)
 
     def rebuildTagFiles(self):
         """ rebuild the tags file """
@@ -273,8 +274,14 @@ def autotag():
     """ Do the work """
     try:
         if not vim_global("Disabled", bool):
+            cdir = os.getcwd() + "/"
+            cfile = vim.eval("expand(\"%:p\")")
+            if not cfile.startswith(cdir):
+                AutoTag.LOG.log(10, "Donothing: File outof current-dir %s", fdir)
+                return
+
             at = AutoTag()
-            at.addSource(vim.eval("expand(\"%:p\")"))
+            at.addSource(cfile)
             at.rebuildTagFiles()
     except Exception:  # pylint: disable=W0703
         logging.warning(format_exc())
